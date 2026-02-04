@@ -13,6 +13,9 @@ import SignupPage from "./pages/SignupPage";
 import BrowsePage from "./pages/BrowsePage";
 import VideoPlayerPage from "./pages/VideoPlayerPage";
 import SubscribePage from "./pages/SubscribePage";
+import LiveClassesPage from "./pages/LiveClassesPage";
+import WishlistPage from "./pages/WishlistPage";
+import HistoryPage from "./pages/HistoryPage";
 import NotFound from "./pages/NotFound";
 
 // Admin Pages
@@ -38,6 +41,9 @@ const App = () => (
             <Route path="/browse" element={<BrowsePage />} />
             <Route path="/video/:id" element={<VideoPlayerPage />} />
             <Route path="/subscribe" element={<SubscribePage />} />
+            <Route path="/live" element={<LiveClassesPage />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/history" element={<HistoryPage />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={
