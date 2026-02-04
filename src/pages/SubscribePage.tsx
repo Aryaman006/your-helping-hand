@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserLayout } from '@/components/layout/UserLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Crown,
@@ -17,6 +18,44 @@ import {
   Loader2,
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    email: string;
+    contact: string;
+  };
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpayResponse) => void;
+  modal: {
+    ondismiss: () => void;
+  };
+}
+
+interface RazorpayInstance {
+  open: () => void;
+  close: () => void;
+}
+
+interface RazorpayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
 const SubscribePage: React.FC = () => {
   const { user, hasActiveSubscription, refreshSubscriptionStatus } = useAuth();
   const navigate = useNavigate();
@@ -25,8 +64,9 @@ const SubscribePage: React.FC = () => {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [couponId, setCouponId] = useState<string | null>(null);
 
-  const basePrice = 999;
+  const basePrice = 1; // Testing price
   const gstRate = 0.05;
   const discountedPrice = basePrice - discount;
   const gstAmount = discountedPrice * gstRate;
@@ -39,20 +79,63 @@ const SubscribePage: React.FC = () => {
     { icon: Shield, text: 'Ad-free experience' },
   ];
 
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
 
     setIsApplyingCoupon(true);
-    // In a real app, this would validate the coupon with the backend
-    // For now, we'll simulate a discount
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    try {
+      const { data: coupon, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode.toUpperCase())
+        .eq('is_active', true)
+        .single();
 
-    if (couponCode.toUpperCase() === 'YOGA100') {
-      setDiscount(100);
-      toast.success('Coupon applied! ₹100 off');
-    } else {
-      toast.error('Invalid coupon code');
+      if (error || !coupon) {
+        toast.error('Invalid coupon code');
+        setIsApplyingCoupon(false);
+        return;
+      }
+
+      const now = new Date();
+      const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null;
+      const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null;
+      
+      const isValidDate = (!validFrom || now >= validFrom) && (!validUntil || now <= validUntil);
+      const hasUsesLeft = !coupon.max_uses || (coupon.uses_count || 0) < coupon.max_uses;
+
+      if (!isValidDate || !hasUsesLeft) {
+        toast.error('Coupon is expired or has reached its usage limit');
+        setIsApplyingCoupon(false);
+        return;
+      }
+
+      let discountValue = 0;
+      if (coupon.discount_amount) {
+        discountValue = coupon.discount_amount;
+      } else if (coupon.discount_percentage) {
+        discountValue = Math.floor(basePrice * (coupon.discount_percentage / 100));
+      }
+
+      setDiscount(discountValue);
+      setCouponId(coupon.id);
+      toast.success(`Coupon applied! ₹${discountValue} off`);
+    } catch {
+      toast.error('Failed to apply coupon');
     }
+    
     setIsApplyingCoupon(false);
   };
 
@@ -62,15 +145,90 @@ const SubscribePage: React.FC = () => {
       return;
     }
 
+    if (!window.Razorpay) {
+      toast.error('Payment system is loading. Please try again.');
+      return;
+    }
+
     setIsProcessing(true);
-    
-    // In a real implementation, this would integrate with Razorpay
-    // For demo purposes, we'll simulate a successful payment
-    toast.info('Payment integration pending', {
-      description: 'Razorpay integration will be added with API key',
-    });
-    
-    setIsProcessing(false);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Please log in to continue');
+      }
+
+      // Create order
+      const orderResponse = await supabase.functions.invoke('create-razorpay-order', {
+        body: { amount: basePrice, couponCode: couponCode || undefined },
+      });
+
+      if (orderResponse.error) {
+        throw new Error(orderResponse.error.message || 'Failed to create order');
+      }
+
+      const { orderId, amount, keyId, prefill, notes } = orderResponse.data;
+
+      // Open Razorpay checkout
+      const options: RazorpayOptions = {
+        key: keyId,
+        amount: amount,
+        currency: 'INR',
+        name: 'PLAYoga',
+        description: 'Premium Yearly Subscription',
+        order_id: orderId,
+        prefill: {
+          name: prefill.name || '',
+          email: prefill.email || '',
+          contact: prefill.contact || '',
+        },
+        theme: {
+          color: '#D4A574',
+        },
+        handler: async (response: RazorpayResponse) => {
+          try {
+            // Verify payment
+            const verifyResponse = await supabase.functions.invoke('verify-razorpay-payment', {
+              body: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                couponId: notes.couponId,
+                baseAmount: notes.baseAmount,
+                gstAmount: notes.gstAmount,
+                discountAmount: notes.discount,
+                totalAmount: amount / 100,
+              },
+            });
+
+            if (verifyResponse.error) {
+              throw new Error(verifyResponse.error.message || 'Payment verification failed');
+            }
+
+            toast.success('Payment successful! Welcome to Premium!');
+            await refreshSubscriptionStatus();
+            navigate('/browse');
+          } catch (err) {
+            console.error('Payment verification error:', err);
+            toast.error('Payment verification failed. Please contact support.');
+          }
+          setIsProcessing(false);
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
+            toast.info('Payment cancelled');
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (err) {
+      console.error('Payment error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to initiate payment');
+      setIsProcessing(false);
+    }
   };
 
   if (hasActiveSubscription) {
