@@ -1,0 +1,149 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
+    const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      throw new Error("Razorpay credentials not configured");
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get user from auth header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("No authorization header");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { amount, couponCode } = await req.json();
+
+    // Validate coupon if provided
+    let discount = 0;
+    let couponId = null;
+    
+    if (couponCode) {
+      const { data: coupon } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.toUpperCase())
+        .eq("is_active", true)
+        .single();
+
+      if (coupon) {
+        const now = new Date();
+        const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null;
+        const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null;
+        
+        const isValidDate = (!validFrom || now >= validFrom) && (!validUntil || now <= validUntil);
+        const hasUsesLeft = !coupon.max_uses || (coupon.uses_count || 0) < coupon.max_uses;
+
+        if (isValidDate && hasUsesLeft) {
+          if (coupon.discount_amount) {
+            discount = coupon.discount_amount;
+          } else if (coupon.discount_percentage) {
+            discount = Math.floor(amount * (coupon.discount_percentage / 100));
+          }
+          couponId = coupon.id;
+        }
+      }
+    }
+
+    const baseAmount = amount - discount;
+    const gstAmount = Math.round(baseAmount * 0.05 * 100) / 100;
+    const totalAmount = baseAmount + gstAmount;
+    const amountInPaise = Math.round(totalAmount * 100);
+
+    // Create Razorpay order
+    const credentials = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+    
+    const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${credentials}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `receipt_${user.id}_${Date.now()}`,
+        notes: {
+          user_id: user.id,
+          coupon_id: couponId,
+          base_amount: baseAmount,
+          gst_amount: gstAmount,
+          discount_amount: discount,
+        },
+      }),
+    });
+
+    if (!orderResponse.ok) {
+      const errorData = await orderResponse.text();
+      console.error("Razorpay order creation failed:", errorData);
+      throw new Error(`Failed to create Razorpay order: ${errorData}`);
+    }
+
+    const order = await orderResponse.json();
+
+    // Get user profile for prefill
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .eq("user_id", user.id)
+      .single();
+
+    return new Response(
+      JSON.stringify({
+        orderId: order.id,
+        amount: amountInPaise,
+        currency: "INR",
+        keyId: RAZORPAY_KEY_ID,
+        prefill: {
+          name: profile?.full_name || "",
+          email: user.email || "",
+          contact: profile?.phone || "",
+        },
+        notes: {
+          couponId,
+          discount,
+          gstAmount,
+          baseAmount,
+        },
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
+  } catch (error: unknown) {
+    console.error("Error creating order:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      }
+    );
+  }
+});
