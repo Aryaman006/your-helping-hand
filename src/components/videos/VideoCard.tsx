@@ -60,11 +60,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </div>
           )}
 
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* 🔧 FIXED OVERLAYS (no click blocking) */}
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-charcoal/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-          {/* Play button */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
               <Play className="w-8 h-8 text-white fill-white" />
             </div>
@@ -76,7 +75,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             {formatDuration(duration)}
           </div>
 
-          {/* Premium badge */}
+          {/* Premium */}
           {isPremium && (
             <div className="absolute top-3 left-3 premium-badge flex items-center space-x-1">
               <Crown className="w-3 h-3" />
@@ -84,7 +83,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </div>
           )}
 
-          {/* Progress bar */}
+          {/* Progress */}
           {progress > 0 && (
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-charcoal/50">
               <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -100,11 +99,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
           {description && <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{description}</p>}
 
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-gold">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">+{yogicPoints} pts</span>
-            </div>
+          <div className="mt-3 flex items-center space-x-2 text-gold">
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-medium">+{yogicPoints} pts</span>
           </div>
         </div>
       </Link>
