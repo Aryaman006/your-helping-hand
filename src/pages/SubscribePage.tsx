@@ -96,42 +96,28 @@ const SubscribePage: React.FC = () => {
     setIsApplyingCoupon(true);
     
     try {
-      const { data: coupon, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', couponCode.toUpperCase())
-        .eq('is_active', true)
-        .single();
+       // Call edge function to validate coupon securely
+       const response = await supabase.functions.invoke('validate-coupon', {
+         body: { code: couponCode, baseAmount: basePrice },
+       });
 
-      if (error || !coupon) {
-        toast.error('Invalid coupon code');
+       if (response.error) {
+         toast.error('Failed to validate coupon');
+         setIsApplyingCoupon(false);
+         return;
+       }
+ 
+       const result = response.data;
+ 
+       if (!result.valid) {
+         toast.error(result.message || 'Invalid coupon code');
         setIsApplyingCoupon(false);
         return;
       }
 
-      const now = new Date();
-      const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null;
-      const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null;
-      
-      const isValidDate = (!validFrom || now >= validFrom) && (!validUntil || now <= validUntil);
-      const hasUsesLeft = !coupon.max_uses || (coupon.uses_count || 0) < coupon.max_uses;
-
-      if (!isValidDate || !hasUsesLeft) {
-        toast.error('Coupon is expired or has reached its usage limit');
-        setIsApplyingCoupon(false);
-        return;
-      }
-
-      let discountValue = 0;
-      if (coupon.discount_amount) {
-        discountValue = coupon.discount_amount;
-      } else if (coupon.discount_percentage) {
-        discountValue = Math.floor(basePrice * (coupon.discount_percentage / 100));
-      }
-
-      setDiscount(discountValue);
-      setCouponId(coupon.id);
-      toast.success(`Coupon applied! ₹${discountValue} off`);
+       setDiscount(result.discount);
+       setCouponId(result.couponId);
+       toast.success(result.message);
     } catch {
       toast.error('Failed to apply coupon');
     }

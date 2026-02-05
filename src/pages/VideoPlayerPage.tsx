@@ -188,13 +188,13 @@ const VideoPlayerPage: React.FC = () => {
 
     // Award points if not already awarded
     if (!watchProgress?.points_awarded && video.yogic_points > 0) {
-      const { data, error } = await supabase.rpc('award_yogic_points', {
-        _user_id: user.id,
-        _video_id: id,
+       // Call edge function to award points with server-side validation
+       const awardResponse = await supabase.functions.invoke('award-yogic-points', {
+         body: { videoId: id },
       });
 
-      if (!error && data > 0) {
-        toast.success(`🎉 You earned ${data} Yogic Points!`, {
+       if (!awardResponse.error && awardResponse.data?.points > 0) {
+         toast.success(`🎉 You earned ${awardResponse.data.points} Yogic Points!`, {
           description: 'Great job completing this session!',
         });
         refreshYogicPoints();
