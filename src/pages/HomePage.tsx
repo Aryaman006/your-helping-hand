@@ -142,7 +142,7 @@ const HomePage: React.FC = () => {
                       <ArrowRight className="ml-2 w-5 h-5" />
                     </Link>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 text-lg px-8">
+                  <Button asChild size="lg" variant="outline" className="bg-white text-charcoal border-white hover:bg-white/90 hover:text-charcoal text-lg px-8">
                     <Link to="/browse">
                       <Play className="mr-2 w-5 h-5" />
                       Browse Classes
@@ -157,7 +157,7 @@ const HomePage: React.FC = () => {
                       Upgrade to Premium
                     </Link>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 text-lg px-8">
+                  <Button asChild size="lg" variant="outline" className="bg-white text-charcoal border-white hover:bg-white/90 hover:text-charcoal text-lg px-8">
                     <Link to="/browse">
                       <Play className="mr-2 w-5 h-5" />
                       Continue Watching
