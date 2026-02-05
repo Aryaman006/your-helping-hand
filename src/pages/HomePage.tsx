@@ -286,7 +286,7 @@ const HomePage: React.FC = () => {
               {upcomingSessions.map((session) => (
                 <Link
                   key={session.id}
-                  to={`/live/${session.id}`}
+                  to="/live"
                   className="group relative overflow-hidden rounded-2xl bg-card border border-border hover:border-primary/50 hover:shadow-warm transition-all duration-300"
                 >
                   <div className="aspect-video relative">
