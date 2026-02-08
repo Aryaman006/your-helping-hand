@@ -546,8 +546,11 @@ export type Database = {
         Args: { _user_id: string; _video_id: string }
         Returns: number
       }
-      complete_referral: { Args: { _user_id: string }; Returns: undefined }
-      generate_referral_code: { Args: { _user_id: string }; Returns: string }
+      complete_referral: {
+        Args: { _referred_user_id: string }
+        Returns: undefined
+      }
+      generate_referral_code: { Args: { _user_id: string }; Returns: undefined }
       get_user_yogic_points: { Args: { _user_id: string }; Returns: number }
       has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
