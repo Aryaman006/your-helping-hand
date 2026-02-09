@@ -163,6 +163,70 @@ serve(async (req) => {
       console.error("Referral code generation error:", e);
     }
 
+    // Credit referral commission to wallet (server-side only)
+    try {
+      // Find the referral where this user is the referred user and status is completed
+      const { data: referral } = await supabase
+        .from("referrals")
+        .select("id, referrer_id")
+        .eq("referred_user_id", user.id)
+        .eq("status", "completed")
+        .maybeSingle();
+
+      if (referral) {
+        // Check if commission already credited for this subscription
+        const { data: existingCommission } = await supabase
+          .from("commissions")
+          .select("id")
+          .eq("subscription_id", subscription.id)
+          .maybeSingle();
+
+        if (!existingCommission) {
+          const COMMISSION_AMOUNT = 50;
+
+          // Insert commission record
+          await supabase.from("commissions").insert({
+            referral_id: referral.id,
+            referrer_id: referral.referrer_id,
+            referred_user_id: user.id,
+            subscription_id: subscription.id,
+            amount: COMMISSION_AMOUNT,
+          });
+
+          // Upsert wallet and add balance
+          const { data: wallet } = await supabase
+            .from("wallets")
+            .select("id, balance")
+            .eq("user_id", referral.referrer_id)
+            .maybeSingle();
+
+          if (wallet) {
+            await supabase
+              .from("wallets")
+              .update({
+                balance: wallet.balance + COMMISSION_AMOUNT,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", referral.referrer_id);
+          } else {
+            await supabase.from("wallets").insert({
+              user_id: referral.referrer_id,
+              balance: COMMISSION_AMOUNT,
+            });
+          }
+
+          console.log("Commission credited", {
+            referrer: referral.referrer_id,
+            amount: COMMISSION_AMOUNT,
+            subscription: subscription.id,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Commission crediting error:", e);
+      // Don't throw - subscription is already active
+    }
+
     // Update coupon usage if used
     if (couponId) {
       try {

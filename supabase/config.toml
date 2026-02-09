@@ -1,1 +1,4 @@
 project_id = "xoampivltwofgecadktc"
+
+[functions.request-withdrawal]
+verify_jwt = false
