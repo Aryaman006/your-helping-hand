@@ -2,33 +2,16 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ??
-  "https://xoampivltwofgecadktc.supabase.co";
-
-// This is an anon/public key (safe to ship to the client). We keep env support,
-// but also provide a fallback so published builds still work if env injection fails.
-const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvYW1waXZsdHdvZmdlY2Fka3RjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxOTg4OTksImV4cCI6MjA4NTc3NDg5OX0.Vo2-tIrsOegAC6aYpmSwa1U6cRQUHbFxszxX2pQuKG4";
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  // If this ever triggers, Supabase calls will never happen.
-  console.error(
-    "Missing Supabase configuration. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are set."
-  );
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Check if we're in browser environment to safely access localStorage
-const isBrowser = typeof window !== "undefined";
-
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: isBrowser ? localStorage : undefined,
-    persistSession: isBrowser,
-    autoRefreshToken: isBrowser,
-  },
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
 });

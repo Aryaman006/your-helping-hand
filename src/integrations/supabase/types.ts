@@ -65,51 +65,6 @@ export type Database = {
         }
         Relationships: []
       }
-      commissions: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          referral_id: string | null
-          referred_user_id: string
-          referrer_id: string
-          subscription_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          referral_id?: string | null
-          referred_user_id: string
-          referrer_id: string
-          subscription_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          referral_id?: string | null
-          referred_user_id?: string
-          referrer_id?: string
-          subscription_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "commissions_referral_id_fkey"
-            columns: ["referral_id"]
-            isOneToOne: false
-            referencedRelation: "referrals"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commissions_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       coupons: {
         Row: {
           code: string
@@ -314,8 +269,6 @@ export type Database = {
           full_name: string | null
           id: string
           phone: string | null
-          referral_code: string | null
-          referred_by: string | null
           updated_at: string
           user_id: string
         }
@@ -325,8 +278,6 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
-          referral_code?: string | null
-          referred_by?: string | null
           updated_at?: string
           user_id: string
         }
@@ -336,34 +287,8 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
-          referral_code?: string | null
-          referred_by?: string | null
           updated_at?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      referrals: {
-        Row: {
-          created_at: string
-          id: string
-          referred_user_id: string
-          referrer_id: string
-          status: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          referred_user_id: string
-          referrer_id: string
-          status?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          referred_user_id?: string
-          referrer_id?: string
-          status?: string
         }
         Relationships: []
       }
@@ -471,30 +396,6 @@ export type Database = {
           },
         ]
       }
-      wallets: {
-        Row: {
-          balance: number
-          created_at: string
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          balance?: number
-          created_at?: string
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          balance?: number
-          created_at?: string
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       watch_progress: {
         Row: {
           completed: boolean | null
@@ -568,42 +469,6 @@ export type Database = {
           },
         ]
       }
-      withdrawal_requests: {
-        Row: {
-          admin_notes: string | null
-          amount: number
-          created_at: string
-          id: string
-          payment_details: Json
-          payment_method: string
-          processed_at: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          admin_notes?: string | null
-          amount: number
-          created_at?: string
-          id?: string
-          payment_details: Json
-          payment_method: string
-          processed_at?: string | null
-          status?: string
-          user_id: string
-        }
-        Update: {
-          admin_notes?: string | null
-          amount?: number
-          created_at?: string
-          id?: string
-          payment_details?: Json
-          payment_method?: string
-          processed_at?: string | null
-          status?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       yogic_points_transactions: {
         Row: {
           created_at: string
@@ -651,18 +516,9 @@ export type Database = {
         Args: { _user_id: string; _video_id: string }
         Returns: number
       }
-      complete_referral: {
-        Args: { _referred_user_id: string }
-        Returns: undefined
-      }
-      generate_referral_code: { Args: { _user_id: string }; Returns: undefined }
       get_user_yogic_points: { Args: { _user_id: string }; Returns: number }
       has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      process_referral: {
-        Args: { _referral_code: string; _referred_user_id: string }
-        Returns: undefined
-      }
     }
     Enums: {
       subscription_status: "free" | "active" | "expired" | "cancelled"

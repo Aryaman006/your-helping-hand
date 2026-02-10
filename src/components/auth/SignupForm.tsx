@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,8 +9,6 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export const SignupForm: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const refCode = searchParams.get('ref');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,9 +41,9 @@ export const SignupForm: React.FC = () => {
       });
     } else {
       toast.success('Account created!', {
-        description: 'Welcome to Playoga!',
+        description: 'Please check your email to verify your account.',
       });
-      navigate('/home');
+      navigate('/login');
     }
 
     setIsLoading(false);

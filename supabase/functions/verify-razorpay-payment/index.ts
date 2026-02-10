@@ -97,34 +97,27 @@ serve(async (req) => {
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-    // Upsert subscription (handles both existing and missing rows)
+    // Create subscription
     const { data: subscription, error: subError } = await supabase
       .from("subscriptions")
-      .upsert(
-        {
-          user_id: user.id,
-          status: "active",
-          plan_name: "Premium Yearly",
-          starts_at: startsAt.toISOString(),
-          expires_at: expiresAt.toISOString(),
-          amount_paid: totalAmount,
-          gst_amount: gstAmount,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
+      .update({
+        status: "active",
+        plan_name: "Premium Yearly",
+        starts_at: startsAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        amount_paid: totalAmount,
+        gst_amount: gstAmount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id)
       .select()
       .single();
 
-    if (subError || !subscription) {
+    if (subError) {
        console.error("Subscription operation failed", {
          timestamp: new Date().toISOString(),
-         operation: "upsert",
+         operation: "update",
          errorType: "SUBSCRIPTION_ERROR",
-         errorMessage: subError?.message,
-         errorDetails: subError?.details,
-         errorCode: subError?.code,
-         userId: user.id,
        });
       throw new Error("Failed to update subscription");
     }
@@ -154,89 +147,6 @@ serve(async (req) => {
          errorType: "PAYMENT_RECORD_ERROR",
        });
       // Don't throw, subscription is already active
-    }
-
-    // Complete referral if this user was referred
-    try {
-      const { error: completeReferralError } = await supabase.rpc("complete_referral", {
-        _referred_user_id: user.id,
-      });
-      if (completeReferralError) {
-        console.error("Referral completion error:", completeReferralError);
-      }
-    } catch (e) {
-      console.error("Referral completion error:", e);
-    }
-
-    // Generate referral code for new subscriber
-    try {
-      await supabase.rpc("generate_referral_code", { _user_id: user.id });
-    } catch (e) {
-      console.error("Referral code generation error:", e);
-    }
-
-    // Credit referral commission to wallet (server-side only)
-    try {
-      // Find the referral where this user is the referred user and status is completed
-      const { data: referral } = await supabase
-        .from("referrals")
-        .select("id, referrer_id")
-        .eq("referred_user_id", user.id)
-        .eq("status", "completed")
-        .maybeSingle();
-
-      if (referral) {
-        // Check if commission already credited for this subscription
-        const { data: existingCommission } = await supabase
-          .from("commissions")
-          .select("id")
-          .eq("subscription_id", subscription.id)
-          .maybeSingle();
-
-        if (!existingCommission) {
-          const COMMISSION_AMOUNT = 50;
-
-          // Insert commission record
-          await supabase.from("commissions").insert({
-            referral_id: referral.id,
-            referrer_id: referral.referrer_id,
-            referred_user_id: user.id,
-            subscription_id: subscription.id,
-            amount: COMMISSION_AMOUNT,
-          });
-
-          // Upsert wallet and add balance
-          const { data: wallet } = await supabase
-            .from("wallets")
-            .select("id, balance")
-            .eq("user_id", referral.referrer_id)
-            .maybeSingle();
-
-          if (wallet) {
-            await supabase
-              .from("wallets")
-              .update({
-                balance: wallet.balance + COMMISSION_AMOUNT,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("user_id", referral.referrer_id);
-          } else {
-            await supabase.from("wallets").insert({
-              user_id: referral.referrer_id,
-              balance: COMMISSION_AMOUNT,
-            });
-          }
-
-          console.log("Commission credited", {
-            referrer: referral.referrer_id,
-            amount: COMMISSION_AMOUNT,
-            subscription: subscription.id,
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Commission crediting error:", e);
-      // Don't throw - subscription is already active
     }
 
     // Update coupon usage if used
