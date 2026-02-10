@@ -1,1 +1,4 @@
 project_id = "xoampivltwofgecadktc"
+
+[functions.process-referral-commission]
+verify_jwt = false

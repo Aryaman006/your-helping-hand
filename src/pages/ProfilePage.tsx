@@ -24,6 +24,7 @@ import {
   X,
   Loader2,
   LogOut,
+  Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -359,6 +360,24 @@ const ProfilePage: React.FC = () => {
                   <p className="text-sm text-muted-foreground">
                     Earned from completing videos
                   </p>
+                </CardContent>
+              </Card>
+
+              {/* Wallet & Referral */}
+              <Card className="border-primary/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    Wallet & Referrals
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Earn ₹50 for every friend who subscribes using your referral link!
+                  </p>
+                  <Button asChild size="sm" className="w-full bg-gradient-warm hover:opacity-90">
+                    <Link to="/wallet">Go to Wallet</Link>
+                  </Button>
                 </CardContent>
               </Card>
 
