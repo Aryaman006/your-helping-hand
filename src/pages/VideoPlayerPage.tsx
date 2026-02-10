@@ -391,6 +391,7 @@ const VideoPlayerPage: React.FC = () => {
             src={video.video_url}
             poster={video.thumbnail_url || undefined}
             className="w-full h-full object-contain"
+            playsInline
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
               if (videoRef.current) {
