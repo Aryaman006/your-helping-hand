@@ -97,19 +97,22 @@ serve(async (req) => {
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-    // Create subscription
+    // Upsert subscription (handles both existing and missing rows)
     const { data: subscription, error: subError } = await supabase
       .from("subscriptions")
-      .update({
-        status: "active",
-        plan_name: "Premium Yearly",
-        starts_at: startsAt.toISOString(),
-        expires_at: expiresAt.toISOString(),
-        amount_paid: totalAmount,
-        gst_amount: gstAmount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", user.id)
+      .upsert(
+        {
+          user_id: user.id,
+          status: "active",
+          plan_name: "Premium Yearly",
+          starts_at: startsAt.toISOString(),
+          expires_at: expiresAt.toISOString(),
+          amount_paid: totalAmount,
+          gst_amount: gstAmount,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      )
       .select()
       .single();
 
