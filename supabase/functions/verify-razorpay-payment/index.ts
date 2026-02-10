@@ -169,6 +169,14 @@ serve(async (req) => {
       }
     }
 
+    // Process referral commission - award ₹50 to referrer on first subscription
+    try {
+      await supabase.rpc("complete_referral", { _referred_user_id: user.id });
+    } catch (e) {
+      console.error("Referral commission processing error:", e);
+      // Don't throw - subscription is already active
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

@@ -18,6 +18,7 @@ import WishlistPage from "./pages/WishlistPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
 import MyVideosPage from "./pages/MyVideosPage";
+import WalletPage from "./pages/WalletPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/my-videos" element={<MyVideosPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/wallet" element={<WalletPage />} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

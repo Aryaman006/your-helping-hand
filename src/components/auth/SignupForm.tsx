@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export const SignupForm: React.FC = () => {
   const [fullName, setFullName] = useState('');
@@ -17,6 +18,8 @@ export const SignupForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +43,20 @@ export const SignupForm: React.FC = () => {
         description: error.message,
       });
     } else {
+      // Process referral if referral code exists
+      if (referralCode) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            await supabase.rpc('process_referral', {
+              _referral_code: referralCode,
+              _referred_user_id: session.user.id,
+            });
+          }
+        } catch (e) {
+          console.error('Referral processing error:', e);
+        }
+      }
       toast.success('Account created!', {
         description: 'Please check your email to verify your account.',
       });
