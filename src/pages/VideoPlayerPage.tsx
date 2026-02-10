@@ -82,6 +82,7 @@ const VideoPlayerPage: React.FC = () => {
 
   const fetchVideo = async () => {
     setIsLoading(true);
+    console.log('[VideoPlayer] Fetching video with id:', id);
     const { data, error } = await supabase
       .from('videos')
       .select('*')
@@ -89,7 +90,13 @@ const VideoPlayerPage: React.FC = () => {
       .eq('is_published', true)
       .maybeSingle();
 
+    console.log('[VideoPlayer] Fetch result:', { data, error });
+    console.log('[VideoPlayer] video_url:', data?.video_url);
+    console.log('[VideoPlayer] video_url type:', typeof data?.video_url);
+    console.log('[VideoPlayer] video_url length:', data?.video_url?.length);
+
     if (error || !data) {
+      console.error('[VideoPlayer] Video not found or error:', error);
       toast.error('Video not found');
       navigate('/browse');
       return;
@@ -394,17 +401,27 @@ const VideoPlayerPage: React.FC = () => {
             playsInline
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
+              console.log('[VideoPlayer] Metadata loaded, duration:', videoRef.current?.duration);
               if (videoRef.current) {
                 setDuration(videoRef.current.duration);
-                // Resume from last position
                 if (watchProgress?.watched_seconds) {
                   videoRef.current.currentTime = watchProgress.watched_seconds;
                 }
               }
             }}
             onEnded={handleVideoEnded}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
+            onPlay={() => { console.log('[VideoPlayer] Play event fired'); setIsPlaying(true); }}
+            onPause={() => { console.log('[VideoPlayer] Pause event fired'); setIsPlaying(false); }}
+            onError={(e) => {
+              const mediaError = videoRef.current?.error;
+              console.error('[VideoPlayer] Video error:', {
+                code: mediaError?.code,
+                message: mediaError?.message,
+                src: video.video_url,
+              });
+            }}
+            onLoadStart={() => console.log('[VideoPlayer] Load started for:', video.video_url)}
+            onCanPlay={() => console.log('[VideoPlayer] Video can play')}
           />
 
           {/* Play/Pause Overlay */}
