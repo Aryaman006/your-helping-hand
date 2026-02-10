@@ -67,7 +67,17 @@ const VideoPlayerPage: React.FC = () => {
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Reset state when video id changes
   useEffect(() => {
+    setVideo(null);
+    setRelatedVideos([]);
+    setWatchProgress(null);
+    setIsInWishlist(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsLoading(true);
+
     if (id) {
       fetchVideo();
     }
@@ -310,8 +320,8 @@ const VideoPlayerPage: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = video
-    ? ((watchProgress?.watched_seconds || currentTime) / video.duration_seconds) * 100
+  const progressPercent = duration > 0
+    ? (currentTime / duration) * 100
     : 0;
 
   // Check if user can watch premium content
