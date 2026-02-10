@@ -116,11 +116,15 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (subError) {
+    if (subError || !subscription) {
        console.error("Subscription operation failed", {
          timestamp: new Date().toISOString(),
-         operation: "update",
+         operation: "upsert",
          errorType: "SUBSCRIPTION_ERROR",
+         errorMessage: subError?.message,
+         errorDetails: subError?.details,
+         errorCode: subError?.code,
+         userId: user.id,
        });
       throw new Error("Failed to update subscription");
     }
