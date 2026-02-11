@@ -22,6 +22,7 @@ import WalletPage from "./pages/WalletPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
+import DeleteAccountPage from "./pages/DeleteAccountPage";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/my-videos" element={<MyVideosPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/delete-account" element={<DeleteAccountPage />} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
