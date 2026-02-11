@@ -82,18 +82,19 @@ const SubscribePage: React.FC = () => {
   }, []);
 
   // Auto login from app token
-  // Auto login from app token
+  // ✅ Auto login from app token (correct way)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const token = params.get("token");
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
 
-    if (!token) return;
+    if (!access_token || !refresh_token) return;
 
     const autoLogin = async () => {
       try {
         const { error } = await supabase.auth.setSession({
-          access_token: token,
-          refresh_token: token, // temporary fallback
+          access_token,
+          refresh_token,
         });
 
         if (error) {
@@ -103,7 +104,7 @@ const SubscribePage: React.FC = () => {
 
         await refreshSubscriptionStatus();
 
-        // Clean URL (remove token)
+        // Clean URL (remove tokens after login)
         navigate("/subscribe", { replace: true });
       } catch (error) {
         console.error("Auto login failed:", error);
