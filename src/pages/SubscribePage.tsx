@@ -38,7 +38,6 @@ interface RazorpayOptions {
 
 interface RazorpayInstance {
   open: () => void;
-  close: () => void;
 }
 
 interface RazorpayResponse {
@@ -51,13 +50,13 @@ const SubscribePage: React.FC = () => {
   const { user, hasActiveSubscription, refreshSubscriptionStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [couponCode, setCouponCode] = useState("");
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  const [discount, setDiscount] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [couponId, setCouponId] = useState<string | null>(null);
 
-  const basePrice = 999; // Production price
+  const [couponCode, setCouponCode] = useState("");
+  const [discount, setDiscount] = useState(0);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const basePrice = 999;
   const gstRate = 0.05;
   const discountedPrice = basePrice - discount;
   const gstAmount = discountedPrice * gstRate;
@@ -70,83 +69,82 @@ const SubscribePage: React.FC = () => {
     { icon: Shield, text: "Ad-free experience" },
   ];
 
-  // Load Razorpay script
+  /* ===============================
+     AUTO LOGIN FROM APP TOKENS
+  =============================== */
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+
+    if (!access_token || !refresh_token) return;
+
+    const autoLogin = async () => {
+      const { error } = await supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      });
+
+      if (error) {
+        console.error("Auto login failed:", error.message);
+        return;
+      }
+
+      await refreshSubscriptionStatus();
+
+      // Clean URL after login
+      navigate("/subscribe", { replace: true });
+    };
+
+    autoLogin();
+  }, [location.search]);
+
+  /* ===============================
+     LOAD RAZORPAY SCRIPT
+  =============================== */
+
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     document.body.appendChild(script);
+
     return () => {
       document.body.removeChild(script);
     };
   }, []);
 
-  // Auto login from app token
-  // Auto login from app token
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get("token");
-
-    if (!token) return;
-
-    const autoLogin = async () => {
-      try {
-        const { error } = await supabase.auth.setSession({
-          access_token: token,
-          refresh_token: token, // temporary fallback
-        });
-
-        if (error) {
-          console.error("Auto login error:", error.message);
-          return;
-        }
-
-        await refreshSubscriptionStatus();
-
-        // Clean URL (remove token)
-        navigate("/subscribe", { replace: true });
-      } catch (error) {
-        console.error("Auto login failed:", error);
-      }
-    };
-
-    autoLogin();
-  }, [location.search]);
+  /* ===============================
+     APPLY COUPON
+  =============================== */
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
 
     setIsApplyingCoupon(true);
 
-    try {
-      // Call edge function to validate coupon securely
-      const response = await supabase.functions.invoke("validate-coupon", {
-        body: { code: couponCode, baseAmount: basePrice },
-      });
+    const response = await supabase.functions.invoke("validate-coupon", {
+      body: { code: couponCode, baseAmount: basePrice },
+    });
 
-      if (response.error) {
-        toast.error("Failed to validate coupon");
-        setIsApplyingCoupon(false);
-        return;
-      }
-
-      const result = response.data;
-
-      if (!result.valid) {
-        toast.error(result.message || "Invalid coupon code");
-        setIsApplyingCoupon(false);
-        return;
-      }
-
-      setDiscount(result.discount);
-      setCouponId(result.couponId);
-      toast.success(result.message);
-    } catch {
-      toast.error("Failed to apply coupon");
+    if (response.error) {
+      toast.error("Invalid coupon code");
+      setIsApplyingCoupon(false);
+      return;
     }
+
+    const result = response.data;
+
+    setDiscount(result.discount || 0);
+    toast.success(result.message || "Coupon applied");
 
     setIsApplyingCoupon(false);
   };
+
+  /* ===============================
+     SUBSCRIBE HANDLER
+  =============================== */
 
   const handleSubscribe = async () => {
     if (!user) {
@@ -155,33 +153,26 @@ const SubscribePage: React.FC = () => {
     }
 
     if (!window.Razorpay) {
-      toast.error("Payment system is loading. Please try again.");
+      toast.error("Payment system loading...");
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
-        throw new Error("Please log in to continue");
-      }
-
-      // Create order
       const orderResponse = await supabase.functions.invoke("create-razorpay-order", {
         body: { amount: basePrice, couponCode: couponCode || undefined },
       });
 
       if (orderResponse.error) {
-        throw new Error(orderResponse.error.message || "Failed to create order");
+        throw new Error("Failed to create order");
       }
 
       const { orderId, amount, keyId, prefill, notes } = orderResponse.data;
 
-      // Open Razorpay checkout
       const options: RazorpayOptions = {
         key: keyId,
-        amount: amount,
+        amount,
         currency: "INR",
         name: "PLAYoga",
         description: "Premium Yearly Subscription",
@@ -189,38 +180,32 @@ const SubscribePage: React.FC = () => {
         prefill: {
           name: prefill.name || "",
           email: prefill.email || "",
-          contact: prefill.contact || "",
+          contact: "",
         },
-        theme: {
-          color: "#D4A574",
-        },
+        theme: { color: "#D4A574" },
         handler: async (response: RazorpayResponse) => {
-          try {
-            // Verify payment
-            const verifyResponse = await supabase.functions.invoke("verify-razorpay-payment", {
-              body: {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                couponId: notes.couponId,
-                baseAmount: notes.baseAmount,
-                gstAmount: notes.gstAmount,
-                discountAmount: notes.discount,
-                totalAmount: amount / 100,
-              },
-            });
+          const verifyResponse = await supabase.functions.invoke("verify-razorpay-payment", {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              couponId: notes.couponId,
+              baseAmount: notes.baseAmount,
+              gstAmount: notes.gstAmount,
+              discountAmount: notes.discount,
+              totalAmount: amount / 100,
+            },
+          });
 
-            if (verifyResponse.error) {
-              throw new Error(verifyResponse.error.message || "Payment verification failed");
-            }
-
-            toast.success("Payment successful! Welcome to Premium!");
-            await refreshSubscriptionStatus();
-            navigate("/browse");
-          } catch (err) {
-            console.error("Payment verification error:", err);
-            toast.error("Payment verification failed. Please contact support.");
+          if (verifyResponse.error) {
+            toast.error("Payment verification failed");
+            setIsProcessing(false);
+            return;
           }
+
+          toast.success("Payment successful 🎉");
+          await refreshSubscriptionStatus();
+          navigate("/browse");
           setIsProcessing(false);
         },
         modal: {
@@ -231,180 +216,59 @@ const SubscribePage: React.FC = () => {
         },
       };
 
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-    } catch (err) {
-      console.error("Payment error:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to initiate payment");
+      new window.Razorpay(options).open();
+    } catch (error) {
+      toast.error("Payment failed");
       setIsProcessing(false);
     }
   };
+
+  /* ===============================
+     ALREADY SUBSCRIBED
+  =============================== */
 
   if (hasActiveSubscription) {
     return (
       <UserLayout>
         <div className="content-container py-16 text-center">
-          <div className="max-w-md mx-auto">
-            <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-              <Crown className="w-10 h-10 text-success" />
-            </div>
-            <h1 className="font-display text-3xl font-bold mb-4">You're Already Premium!</h1>
-            <p className="text-muted-foreground mb-8">
-              You have full access to all premium content. Enjoy your yoga journey!
-            </p>
-            <Button asChild className="bg-gradient-warm">
-              <Link to="/browse">
-                Browse Premium Content
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Link>
-            </Button>
-          </div>
+          <Crown className="w-12 h-12 text-success mx-auto mb-4" />
+          <h1 className="text-3xl font-bold mb-4">You're Already Premium!</h1>
+          <Button asChild>
+            <Link to="/browse">Browse Content</Link>
+          </Button>
         </div>
       </UserLayout>
     );
   }
 
+  /* ===============================
+     MAIN UI
+  =============================== */
+
   return (
     <UserLayout>
-      <div className="content-container py-12">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gold/10 text-gold mb-6">
-              <Crown className="w-4 h-4" />
-              <span className="text-sm font-medium">Premium Membership</span>
-            </div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">Unlock Your Full Potential</h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get unlimited access to all premium yoga classes, live sessions, and exclusive content for just ₹999/year.
-            </p>
+      <div className="content-container py-12 max-w-4xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">Unlock Your Full Potential</h1>
+          <p className="text-muted-foreground">Unlimited yoga classes & premium content.</p>
+        </div>
+
+        <div className="bg-card border rounded-3xl p-8">
+          <div className="text-center mb-6">
+            <span className="text-5xl font-bold">₹{totalAmount.toFixed(2)}</span>
+            <span className="text-muted-foreground"> / year</span>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Features */}
-            <div className="bg-card border border-border rounded-3xl p-8">
-              <h2 className="font-display text-2xl font-semibold mb-6">What's Included</h2>
-              <div className="space-y-4">
-                {features.map((feature, index) => {
-                  const Icon = feature.icon;
-                  return (
-                    <div key={index} className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Icon className="w-5 h-5 text-primary" />
-                      </div>
-                      <span className="font-medium">{feature.text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-8 p-4 rounded-2xl bg-muted/50">
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <Shield className="w-4 h-4" />
-                  <span>30-day money-back guarantee</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Pricing Card */}
-            <div className="bg-gradient-to-br from-charcoal to-terracotta-dark rounded-3xl p-8 text-white">
-              <div className="text-center mb-8">
-                <span className="text-sm text-white/70">Yearly Plan</span>
-                <div className="mt-2">
-                  <span className="text-5xl font-display font-bold">₹{discountedPrice}</span>
-                  <span className="text-white/70">/year</span>
-                </div>
-                {discount > 0 && <div className="mt-2 text-sm text-gold">You save ₹{discount}!</div>}
-              </div>
-
-              {/* Coupon Input */}
-              <div className="mb-6">
-                <Label htmlFor="coupon" className="text-white/70">
-                  Have a coupon?
-                </Label>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    id="coupon"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    placeholder="Enter code"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={applyCoupon}
-                    disabled={isApplyingCoupon}
-                    className="border-white bg-white/20 text-white hover:bg-white/30 font-medium"
-                  >
-                    {isApplyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Price Breakdown */}
-              <div className="space-y-2 text-sm mb-6">
-                <div className="flex justify-between text-white/70">
-                  <span>Base Price</span>
-                  <span>₹{basePrice}</span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-gold">
-                    <span>Coupon Discount</span>
-                    <span>-₹{discount}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-white/70">
-                  <span>GST (5%)</span>
-                  <span>₹{gstAmount.toFixed(2)}</span>
-                </div>
-                <div className="border-t border-white/20 pt-2 flex justify-between font-semibold">
-                  <span>Total</span>
-                  <span>₹{totalAmount.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleSubscribe}
-                disabled={isProcessing}
-                size="lg"
-                className="w-full bg-white text-charcoal hover:bg-white/90"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 w-5 h-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Subscribe Now
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-white/50 text-center mt-4">
-                By subscribing, you agree to our Terms of Service and Privacy Policy
-              </p>
-            </div>
+          <div className="flex gap-2 mb-6">
+            <Input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="Coupon code" />
+            <Button onClick={applyCoupon} disabled={isApplyingCoupon}>
+              {isApplyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+            </Button>
           </div>
 
-          {/* FAQ or Trust Badges */}
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center space-x-6 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-success" />
-                <span>Cancel anytime</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-success" />
-                <span>Secure payment</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-success" />
-                <span>Instant access</span>
-              </div>
-            </div>
-          </div>
+          <Button onClick={handleSubscribe} disabled={isProcessing} className="w-full">
+            {isProcessing ? "Processing..." : "Subscribe Now"}
+          </Button>
         </div>
       </div>
     </UserLayout>
