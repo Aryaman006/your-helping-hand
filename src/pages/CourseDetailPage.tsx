@@ -118,11 +118,27 @@ const CourseDetailPage: React.FC = () => {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
   };
 
+  const GST_RATE = 0.05;
+
+  const getBasePrice = () => {
+    if (!course) return { amount: 0, symbol: '₹' };
+    if (course.price_inr && course.price_inr > 0) return { amount: course.price_inr, symbol: '₹' };
+    if (course.price_usd && course.price_usd > 0) return { amount: course.price_usd, symbol: '$' };
+    return { amount: 0, symbol: '₹' };
+  };
+
   const formatPrice = () => {
-    if (!course) return 'Free';
-    if (course.price_inr && course.price_inr > 0) return `₹${course.price_inr}`;
-    if (course.price_usd && course.price_usd > 0) return `$${course.price_usd}`;
-    return 'Free';
+    const { amount, symbol } = getBasePrice();
+    if (amount <= 0) return 'Free';
+    return `${symbol}${amount}`;
+  };
+
+  const priceBreakdown = () => {
+    const { amount, symbol } = getBasePrice();
+    if (amount <= 0) return null;
+    const gst = Math.round(amount * GST_RATE * 100) / 100;
+    const total = Math.round((amount + gst) * 100) / 100;
+    return { base: amount, gst, total, symbol };
   };
 
   if (isLoading) {
