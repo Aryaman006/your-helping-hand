@@ -87,7 +87,12 @@ serve(async (req) => {
       });
     }
 
-    const amountInSmallest = Math.round(amount * 100);
+    // Apply 5% GST
+    const GST_RATE = 0.05;
+    const basePrice = amount;
+    const gstAmount = Math.round(basePrice * GST_RATE * 100) / 100;
+    const totalAmount = Math.round((basePrice + gstAmount) * 100) / 100;
+    const amountInSmallest = Math.round(totalAmount * 100);
 
     const rzpResponse = await fetch("https://api.razorpay.com/v1/orders", {
       method: "POST",
@@ -102,6 +107,9 @@ serve(async (req) => {
         notes: {
           course_id: courseId,
           user_id: userId || "anonymous",
+          base_price: basePrice,
+          gst_amount: gstAmount,
+          gst_rate: GST_RATE,
         },
       }),
     });
