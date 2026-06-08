@@ -118,11 +118,27 @@ const CourseDetailPage: React.FC = () => {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
   };
 
+  const GST_RATE = 0.05;
+
+  const getBasePrice = () => {
+    if (!course) return { amount: 0, symbol: '₹' };
+    if (course.price_inr && course.price_inr > 0) return { amount: course.price_inr, symbol: '₹' };
+    if (course.price_usd && course.price_usd > 0) return { amount: course.price_usd, symbol: '$' };
+    return { amount: 0, symbol: '₹' };
+  };
+
   const formatPrice = () => {
-    if (!course) return 'Free';
-    if (course.price_inr && course.price_inr > 0) return `₹${course.price_inr}`;
-    if (course.price_usd && course.price_usd > 0) return `$${course.price_usd}`;
-    return 'Free';
+    const { amount, symbol } = getBasePrice();
+    if (amount <= 0) return 'Free';
+    return `${symbol}${amount}`;
+  };
+
+  const priceBreakdown = () => {
+    const { amount, symbol } = getBasePrice();
+    if (amount <= 0) return null;
+    const gst = Math.round(amount * GST_RATE * 100) / 100;
+    const total = Math.round((amount + gst) * 100) / 100;
+    return { base: amount, gst, total, symbol };
   };
 
   if (isLoading) {
@@ -273,9 +289,32 @@ const CourseDetailPage: React.FC = () => {
             <div className="sticky top-24 p-6 rounded-2xl border border-border bg-card space-y-5">
               {course.enable_payment && !isPurchased ? (
                 <>
-                  <div className="text-center">
-                    <span className="text-3xl font-bold">{formatPrice()}</span>
-                  </div>
+                  {(() => {
+                    const pb = priceBreakdown();
+                    if (!pb) {
+                      return (
+                        <div className="text-center">
+                          <span className="text-3xl font-bold">{formatPrice()}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Course price</span>
+                          <span className="font-medium">{pb.symbol}{pb.base}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">GST (5%)</span>
+                          <span className="font-medium">{pb.symbol}{pb.gst.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-border pt-2">
+                          <span className="font-semibold">Total</span>
+                          <span className="text-2xl font-bold">{pb.symbol}{pb.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <Button
                     className="w-full bg-gradient-warm hover:opacity-90 text-lg py-6"
                     onClick={handleEnroll}
