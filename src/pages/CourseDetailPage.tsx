@@ -289,9 +289,32 @@ const CourseDetailPage: React.FC = () => {
             <div className="sticky top-24 p-6 rounded-2xl border border-border bg-card space-y-5">
               {course.enable_payment && !isPurchased ? (
                 <>
-                  <div className="text-center">
-                    <span className="text-3xl font-bold">{formatPrice()}</span>
-                  </div>
+                  {(() => {
+                    const pb = priceBreakdown();
+                    if (!pb) {
+                      return (
+                        <div className="text-center">
+                          <span className="text-3xl font-bold">{formatPrice()}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Course price</span>
+                          <span className="font-medium">{pb.symbol}{pb.base}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">GST (5%)</span>
+                          <span className="font-medium">{pb.symbol}{pb.gst.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-border pt-2">
+                          <span className="font-semibold">Total</span>
+                          <span className="text-2xl font-bold">{pb.symbol}{pb.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <Button
                     className="w-full bg-gradient-warm hover:opacity-90 text-lg py-6"
                     onClick={handleEnroll}
