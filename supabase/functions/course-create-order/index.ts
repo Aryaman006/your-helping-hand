@@ -127,7 +127,7 @@ serve(async (req) => {
         user_id: userId,
         course_id: courseId,
         razorpay_order_id: rzpOrder.id,
-        amount: amount,
+        amount: totalAmount,
         currency: selectedCurrency.code,
         status: "created",
       });
@@ -140,6 +140,10 @@ serve(async (req) => {
         currency: selectedCurrency.code,
         key_id: RAZORPAY_KEY_ID,
         course_title: course.payment_title || course.title,
+        base_price: basePrice,
+        gst_amount: gstAmount,
+        gst_rate: GST_RATE,
+        total_amount: totalAmount,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
